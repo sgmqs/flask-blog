@@ -5,19 +5,23 @@
 # @Version : $Id$
 
 from app import app
+from flask import render_template
 
 @app.route('/')
 @app.route('/index')
 def index():
 	user 	=	{'nickname':'sgmqs'}
-	return ''' 
-<html>
-	<head>
-		<title>Home Page</title>
-	</head>
-	<body>
-		<h1>Hello ,'''+user['nickname']+'''</h1>
-
-	</body>	
-</html>	
-'''
+	posts=[
+		{
+			'author':{'nickname':'Jack'},
+			'body':'Beautiful day in protland!'
+		},
+		{
+			'author':{'nickname':'zhan san'},
+			'body':'The avergers movie was so cool!'
+		}
+	]
+	return render_template('index.html',
+		title='Home',
+		user=user,
+		posts=posts)

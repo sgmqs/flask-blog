@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+{% if title %}
+<title>{{title}} - sgmqsblog</title>
+{% else %}
+<title>Welcome to - sgmqsblog</title>
+{% endif %}
+<meta name="description" content="">
+<meta name="keywords" content="">
+<link href="" rel="stylesheet">
+</head>
+<body>
+    <div>
+    	sgmqsblog:<a href="/index">Home</a>
+    </div>
+    <hr>
+    {% block content%} {% endblock %}
+</body>
+</html>
