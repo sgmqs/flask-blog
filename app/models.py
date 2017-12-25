@@ -7,6 +7,12 @@
 
 from app import db
 from hashlib import md5
+
+followers	=	db.Table('followers',
+		db.Column('follower_id',db.Integer,db.ForeignKey('user.id')),
+		db.Column('followed_id',db.Integer,db.ForeignKey('user.id'))
+	)
+
 class User(db.Model):
 	"""docstring for User"""
 	id 	=	db.Column(db.Integer,primary_key=True)
@@ -15,6 +21,36 @@ class User(db.Model):
 	posts	=	db.relationship('Post',backref='author',lazy='dynamic')
 	about_me	=	db.Column(db.String(140))
 	last_seen =	db.Column(db.DateTime)
+	role 	=	db.Column(db.Integer)
+	# followed = db.relationship('User',
+	# 		secondary = followers,
+	# 		primaryjoin= (followers.c.follower_id==id),
+	# 		secondaryjoin = (followers.c.followed_id==id),
+	# 		backref=db.backref('followers',lazy='dynamic'),
+	# 		lazy='dynamic'
+	# 	)
+	followed = db.relationship('User',
+		secondary = followers,
+		primaryjoin = (followers.c.follower_id == id),
+		secondaryjoin = (followers.c.followed_id == id),
+		backref = db.backref('followers', lazy = 'dynamic'),
+		lazy = 'dynamic')
+	#被关注者提交的文章 follower_id--关注者id  followed_id--被 关注者id
+	def followed_posts(self,uid):
+		return Post.query.join(followers,(followers.c.followed_id==Post.user_id)).filter(followers.c.follower_id==uid).order_by(Post.timestamp.desc())
+
+	def follow(self, user):
+		if not self.is_following(user):
+			self.followed.append(user)
+			return self
+
+	def unfollow(self, user):
+		if self.is_following(user):
+			self.followed.remove(user)
+			return self
+
+	def is_following(self, uid):
+		return self.followed.filter(followers.c.followed_id == uid).count() > 0
 
 	@property
 	def is_authenticated(self):
@@ -50,6 +86,7 @@ class User(db.Model):
 			version 	+=	1
 				
 		return new_nickname
+
 
 
 	def __repr__(self):

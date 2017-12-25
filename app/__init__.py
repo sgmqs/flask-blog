@@ -14,6 +14,7 @@ from flask.ext.sqlalchemy import SQLAlchemy
 
 
 
+
 app	=	Flask(__name__)
 
 
@@ -48,4 +49,7 @@ lm.login_view	=	'login'
 
 oid = OpenID(app,os.path.join(basedir,'tmp'))
 from app import views,models
+
+from .momentjs import momentjs
+app.jinja_env.globals['momentjs']=momentjs
 

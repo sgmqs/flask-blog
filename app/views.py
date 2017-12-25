@@ -7,16 +7,65 @@
 from app import app,db,lm,oid
 from flask import render_template,flash,redirect,session,url_for,request,g
 from flask.ext.login import login_user,logout_user,current_user,login_required
-from .forms import LoginForm,EditForm
-from .models import User
+from .forms import LoginForm,EditForm,PostForm
+from .models import User,Post
 from datetime import datetime
+from config import POSTS_PER_PAGE,DATABASE_QUERY_TIMEOUT
+from flask.ext.sqlalchemy import get_debug_queries
+# from flask.ext.sqlalchemy import get_debug_queries
 
 
-@app.route('/')
-@app.route('/index')
+@app.route('/follow/<nickname>')
+def follow(nickname):
+	user = User.query.filter_by(nickname=nickname).firstI()
+	if user is None:
+		flash('User {0} not found'.format(nickname))
+		return redirect(url_for('index'))
+	if user==g.user:
+		flash('You can\'t follow yourself!')
+		return redirect(url_for('user',nickname=nickname))
+	u = g.user.follow(user)
+	if u is None:
+		flash('Cannot follow {0}'.format(nickname))
+		return redirect(url_for('user',nickname=nickname))
+	db.session.add(u)
+	db.session.commit()
+	flash('You are now following {0}'.format(nickname))
+	return redirect(url_for('user',nickname=nickname))
+
+@app.route('/unfollow/<nickname>')
+def unfollow(nickname):
+	user = User.query.filter_by(nickname=nickname).firts()
+	if user is None:
+		flash('User {0} not found'.format(nickname))
+		return redirect(url_for('index'))
+	if user==g.user:
+		flash('You can\'t unfollow yourself!')
+		return redirect(url_for('user',nickname=nickname))
+
+	u = g.user.unfollow(user)
+	if u is None:
+		flash('Cannot unfollow {0}'.format(nickname))
+		return redirect(url_for('user',nickname=nickname))
+	db.session.add(u)
+	db.session.commit()
+	flash('You have stopped following {0}'.format(nickname))
+	return redirect(url_for('user',nickname=nickname))
+
+
+@app.route('/',methods=['POST','GET'])
+@app.route('/index',methods=['POST','GET'])
+@app.route('/index/<int:page>',methods=['POST','GET'])
 # @login_required
-def index():
+def index(page=1):
 	#user 	=	{'nickname':'sgmqs'}
+	form 	=	PostForm()
+	if form.validate_on_submit():
+		post = Post(body=form.post.data,timestamp=datetime.utcnow(),user_id=session['id'])
+		db.session.add(post)
+		db.session.commit()
+		flash('You post is now live!')
+		return redirect(url_for('index'))
 
 	posts=[
 		{
@@ -28,15 +77,21 @@ def index():
 			'body':'The avergers movie was so cool!'
 		}
 	]
+	#posts = User().followed_posts(session['id']).all()
+	posts = User().followed_posts(session['id']).paginate(page,POSTS_PER_PAGE,False)
+	print("posts:",posts)
 	return render_template('index.html',
 		title='Home',
-		user=user,
-		posts=posts)
+		form=form,
+		posts=posts,
+		user = user
+		)
 
 @app.route('/login',methods=['POST','GET'])
 # @oid.loginhandler
 def login():
 	# exit(1)
+	print(session)
 
 	# for x in g:
 	# 	pass
@@ -62,6 +117,9 @@ def login():
 			user = User(nickname=nickname,email=nickname+'@sgmqsblog.com')
 			db.session.add(user)
 			db.session.commit()
+			#make the user follw him/herself
+			db.session.add(User.follow(user))
+			db.session.commit()
 			print("---ppp-------------",user.id)
 			session['nickname'] = nickname
 			session['id']	=	user.id
@@ -77,18 +135,25 @@ def login():
 @app.before_request
 def before_request():
 	pass
-	 # g.user = current_user
+	g.user = current_user
 	#print(dir(current_user.nickname))
-	# if session['nickname'] is not None:
+	if session['_id'] is not None:
 		# User.last_seen	=	datetime.utcnow()
 		# User.nickname 	=	session['nickname']
 		## sqlalchery session orm 配合commit使用   类库 session 做事务处理
-		#db.session.query(User).filter(User.nickname==session['nickname']).update({'last_seen':datetime.utcnow()})
-		#db.session.commit()
-		# User.update().where(User.nickname==session['nickname']).values(last_seen=datetime.utcnow())
+		db.session.query(User).filter(User.nickname==session['nickname']).update({'last_seen':datetime.utcnow()})
+		db.session.commit()
+		
 		## sqlalchery orm   类库
 		# User.query.filter(User.nickname==session['nickname']).update({'last_seen':datetime.utcnow()})
 		# db.session.add(User)
+
+@app.after_request
+def after_request(response):
+	for query in get_debug_queries():
+		if query.duration>=DATABASE_QUERY_TIMEOUT:
+			app.logger.warning("Slow Query:%s\nParameters:%s\nDuration:%fs\nConteext:%s\n" %(query.statement,query.parameters,query.duration,query.context))
+	return response
 		
 
 
@@ -136,9 +201,11 @@ def logout():
 	session['nickname']=None
 	return redirect(url_for('index'))
 
+@app.route('/user/<nickname>/<int:page>')
 @app.route('/user/<nickname>')
-def user(nickname):
+def user(nickname,page=1):
 	# print(app.config['SQLALCHEMY_DATABASE_URL'])
+	print(dir(g.user))
 	user =	User.query.filter_by(nickname=nickname).first()
 	if user==None:
 		flash('User '+nickname+' not found')
@@ -147,6 +214,11 @@ def user(nickname):
 		{'author':user,'body':'test post #1'},
 		{'author':user,'body':'test post #2'}
 	]
+
+	print("posts:",user.posts)
+
+	posts = user.posts
+
 	return render_template('user.html',
 		 posts = posts,
 		 user = user

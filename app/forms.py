@@ -9,6 +9,13 @@ from flask.ext.wtf import Form
 from wtforms import StringField,BooleanField,TextAreaField,IntegerField
 from wtforms.validators import DataRequired,Length
 from app.models import User
+
+class PostForm(Form):
+	"""docstring for PostForm"""
+	post 	=	StringField('post',validators=[DataRequired()])
+	
+		
+
 class LoginForm(Form):
 	"""docstring for LoginForm"""
 	openid	=	StringField('openid',validators=[DataRequired()])
